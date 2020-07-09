@@ -147,3 +147,9 @@ func (b *AMQPCeleryBackend) SetResult(taskID string, result *ResultMessage) erro
 		message,
 	)
 }
+
+// DeleteResult deletes the result from the AMQP queue
+func (cb *AMQPCeleryBackend) DeleteResult(taskID string) error {
+	// Not implemented
+	return nil
+}

@@ -27,6 +27,7 @@ type CeleryBroker interface {
 type CeleryBackend interface {
 	GetResult(string) (*ResultMessage, error) // must be non-blocking
 	SetResult(taskID string, result *ResultMessage) error
+	DeleteResult(string) error
 }
 
 // NewCeleryClient creates new celery client
@@ -124,6 +125,7 @@ func (ar *AsyncResult) Get(timeout time.Duration) (interface{}, error) {
 	for {
 		select {
 		case <-timeoutChan:
+			ticker.Stop()
 			err := fmt.Errorf("%v timeout getting result for %s", timeout, ar.TaskID)
 			return nil, err
 		case <-ticker.C:
@@ -131,6 +133,7 @@ func (ar *AsyncResult) Get(timeout time.Duration) (interface{}, error) {
 			if err != nil {
 				continue
 			}
+			ticker.Stop()
 			return val, nil
 		}
 	}
