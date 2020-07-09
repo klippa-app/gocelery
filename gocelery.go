@@ -27,7 +27,7 @@ type CeleryBroker interface {
 type CeleryBackend interface {
 	GetResult(string) (*ResultMessage, error) // must be non-blocking
 	SetResult(taskID string, result *ResultMessage) error
-	DeleteResult(string) error
+	DeleteResult(taskID string) error
 }
 
 // NewCeleryClient creates new celery client
