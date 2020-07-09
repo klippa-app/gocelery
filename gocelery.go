@@ -170,3 +170,12 @@ func (ar *AsyncResult) Ready() (bool, error) {
 	ar.result = val
 	return (val != nil), nil
 }
+
+// Delete deletes the result from the backend
+func (ar *AsyncResult) Delete() error {
+	err := ar.backend.DeleteResult(ar.TaskID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
