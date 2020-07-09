@@ -64,3 +64,14 @@ func (cb *RedisCeleryBackend) SetResult(taskID string, result *ResultMessage) er
 	_, err = conn.Do("SETEX", fmt.Sprintf("celery-task-meta-%s", taskID), 86400, resBytes)
 	return err
 }
+
+// DeleteResult deletes the result from the redis backend
+func (cb *RedisCeleryBackend) DeleteResult(taskID string) error {
+	conn := cb.Get()
+	defer conn.Close()
+	_, err := conn.Do("DEL", fmt.Sprintf("celery-task-meta-%s", taskID))
+	if err != nil {
+		return err
+	}
+	return nil
+}
