@@ -120,7 +120,7 @@ type TaskMessage struct {
 	Expires   *string                `json:"expires"`
 	RootID    *string                `json:"root_id"`
 	ParentID  *string                `json:"parent_id"`
-	GroupID   *string                `json:"parent_id"`
+	GroupID   *string                `json:"group_id"`
 	TimeLimit []float64              `json:"timelimit"`
 }
 

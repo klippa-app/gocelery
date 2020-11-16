@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"reflect"
 	"testing"
+	"time"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -20,10 +21,6 @@ func TestBackendRedisGetResult(t *testing.T) {
 		name    string
 		backend *RedisCeleryBackend
 	}{
-		{
-			name:    "get result from redis backend",
-			backend: redisBackend,
-		},
 		{
 			name:    "get result from redis backend with connection",
 			backend: redisBackendWithConn,
@@ -40,9 +37,7 @@ func TestBackendRedisGetResult(t *testing.T) {
 			releaseResultMessage(resultMessage)
 			continue
 		}
-		conn := tc.backend.Get()
-		defer conn.Close()
-		_, err = conn.Do("SETEX", fmt.Sprintf("celery-task-meta-%s", taskID), 86400, messageBytes)
+		_, err = tc.backend.Client.SetEX(tc.backend.Context(), fmt.Sprintf("celery-task-meta-%s", taskID), messageBytes, time.Second * 86400).Result()
 		if err != nil {
 			t.Errorf("test '%s': error setting result message to celery: %v", tc.name, err)
 			releaseResultMessage(resultMessage)
@@ -68,10 +63,6 @@ func TestBackendRedisSetResult(t *testing.T) {
 		backend *RedisCeleryBackend
 	}{
 		{
-			name:    "set result to redis backend",
-			backend: redisBackend,
-		},
-		{
 			name:    "set result to redis backend with connection",
 			backend: redisBackendWithConn,
 		},
@@ -86,9 +77,7 @@ func TestBackendRedisSetResult(t *testing.T) {
 			releaseResultMessage(resultMessage)
 			continue
 		}
-		conn := tc.backend.Get()
-		defer conn.Close()
-		val, err := conn.Do("GET", fmt.Sprintf("celery-task-meta-%s", taskID))
+		val, err := tc.backend.Get(tc.backend.Context(), fmt.Sprintf("celery-task-meta-%s", taskID)).Bytes()
 		if err != nil {
 			t.Errorf("test '%s': error getting data from redis: %v", tc.name, err)
 			releaseResultMessage(resultMessage)
@@ -100,7 +89,7 @@ func TestBackendRedisSetResult(t *testing.T) {
 			continue
 		}
 		var res ResultMessage
-		err = json.Unmarshal(val.([]byte), &res)
+		err = json.Unmarshal(val, &res)
 		if err != nil {
 			t.Errorf("test '%s': error parsing json result", tc.name)
 			releaseResultMessage(resultMessage)
@@ -119,10 +108,6 @@ func TestBackendSetGetResult(t *testing.T) {
 		name    string
 		backend CeleryBackend
 	}{
-		{
-			name:    "set/get result to redis backend",
-			backend: redisBackend,
-		},
 		{
 			name:    "set/get result to redis backend with connection",
 			backend: redisBackendWithConn,

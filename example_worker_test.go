@@ -7,26 +7,19 @@ package gocelery
 import (
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 func Example_worker() {
-
-	// create redis connection pool
-	redisPool := &redis.Pool{
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.DialURL("redis://")
-			if err != nil {
-				return nil, err
-			}
-			return c, err
-		},
-	}
+	// create redis connection client
+	redisClient = redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
 
 	// initialize celery client
 	cli, _ := NewCeleryClient(
-		NewRedisBroker(redisPool),
-		&RedisCeleryBackend{Pool: redisPool},
+		NewRedisBroker(redisClient),
+		&RedisCeleryBackend{Client: redisClient},
 		5, // number of workers
 	)
 

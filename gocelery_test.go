@@ -11,26 +11,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 	uuid "github.com/satori/go.uuid"
 )
 
 const TIMEOUT = 2 * time.Second
 
 var (
-	redisPool = &redis.Pool{
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.DialURL("redis://")
-			if err != nil {
-				return nil, err
-			}
-			return c, err
-		},
-	}
-	redisBroker          = NewRedisCeleryBroker("redis://")
-	redisBrokerWithConn  = NewRedisBroker(redisPool)
-	redisBackend         = NewRedisCeleryBackend("redis://")
-	redisBackendWithConn = NewRedisBackend(redisPool)
+	// create redis connection client
+	redisClient = redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	redisBrokerWithConn  = NewRedisBroker(redisClient)
+	redisBackendWithConn = NewRedisBackend(redisClient)
 	amqpBroker           = NewAMQPCeleryBroker("amqp://")
 	amqpBackend          = NewAMQPCeleryBackend("amqp://")
 )
@@ -48,16 +41,6 @@ func TestInteger(t *testing.T) {
 		inB      int
 		expected int
 	}{
-		{
-			name:     "integer addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: addInt,
-			inA:      2485,
-			inB:      6468,
-			expected: 8953,
-		},
 		{
 			name:     "integer addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
@@ -83,7 +66,9 @@ func TestInteger(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()
@@ -116,16 +101,6 @@ func TestIntegerNamedArguments(t *testing.T) {
 		inB      int
 		expected int
 	}{
-		{
-			name:     "integer addition (named arguments) with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: &addIntTask{},
-			inA:      2485,
-			inB:      6468,
-			expected: 8953,
-		},
 		{
 			name:     "integer addition (named arguments) with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
@@ -191,16 +166,6 @@ func TestString(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "string addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: addStr,
-			inA:      "hello",
-			inB:      "world",
-			expected: "helloworld",
-		},
-		{
 			name:     "string addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -225,7 +190,9 @@ func TestString(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()
@@ -257,16 +224,6 @@ func TestStringNamedArguments(t *testing.T) {
 		inB      string
 		expected string
 	}{
-		{
-			name:     "string addition (named arguments) with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: &addStrTask{},
-			inA:      "hello",
-			inB:      "world",
-			expected: "helloworld",
-		},
 		{
 			name:     "string addition (named arguments) with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
@@ -331,16 +288,6 @@ func TestStringInteger(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "integer and string concatenation with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: addStrInt,
-			inA:      "hello",
-			inB:      5,
-			expected: "hello5",
-		},
-		{
 			name:     "integer and string concatenation with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -365,7 +312,9 @@ func TestStringInteger(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()
@@ -397,16 +346,6 @@ func TestStringIntegerNamedArguments(t *testing.T) {
 		inB      int
 		expected string
 	}{
-		{
-			name:     "integer and string concatenation (named arguments) with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: &addStrIntTask{},
-			inA:      "hello",
-			inB:      5,
-			expected: "hello5",
-		},
 		{
 			name:     "integer and string concatenation (named arguments) with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
@@ -471,16 +410,6 @@ func TestFloat(t *testing.T) {
 		expected float64
 	}{
 		{
-			name:     "float addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: addFloat,
-			inA:      3.4580,
-			inB:      5.3688,
-			expected: 8.8268,
-		},
-		{
 			name:     "float addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -505,7 +434,9 @@ func TestFloat(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()
@@ -537,16 +468,6 @@ func TestFloatNamedArguments(t *testing.T) {
 		inB      float64
 		expected float64
 	}{
-		{
-			name:     "float addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: &addFloatTask{},
-			inA:      3.4580,
-			inB:      5.3688,
-			expected: 8.8268,
-		},
 		{
 			name:     "float addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
@@ -614,16 +535,6 @@ func TestFloat32(t *testing.T) {
 		expected float32
 	}{
 		{
-			name:     "float32 addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: addFloat32,
-			inA:      3.4580,
-			inB:      5.3688,
-			expected: float32(8.8268),
-		},
-		{
 			name:     "float32 addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -648,7 +559,9 @@ func TestFloat32(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()
@@ -683,16 +596,6 @@ func TestFloat32NamedArguments(t *testing.T) {
 		inB      float32
 		expected float32
 	}{
-		{
-			name:     "float32 addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: &addFloat32Task{},
-			inA:      3.4580,
-			inB:      5.3688,
-			expected: float32(8.8268),
-		},
 		{
 			name:     "float32 addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
@@ -757,16 +660,6 @@ func TestBool(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "boolean and operation with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: andBool,
-			inA:      true,
-			inB:      false,
-			expected: false,
-		},
-		{
 			name:     "boolean and operation with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -791,7 +684,9 @@ func TestBool(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()
@@ -823,16 +718,6 @@ func TestBoolNamedArguments(t *testing.T) {
 		inB      bool
 		expected bool
 	}{
-		{
-			name:     "boolean and operation (named arguments) with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: &andBoolTask{},
-			inA:      true,
-			inB:      false,
-			expected: false,
-		},
 		{
 			name:     "boolean and operation (named arguments) with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
@@ -898,16 +783,6 @@ func TestArrayIntNamedArguments(t *testing.T) {
 		expected int
 	}{
 		{
-			name:     "maximum array length (named arguments) with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: &maxArrLenTask{},
-			inA:      []string{"a", "b", "c", "d"},
-			inB:      []string{"e", "f", "g", "h"},
-			expected: 4,
-		},
-		{
 			name:     "maximum array length (named arguments) with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -972,16 +847,6 @@ func TestArray(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:     "array addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: addArr,
-			inA:      []string{"a", "b", "c", "d"},
-			inB:      []string{"e", "f", "g", "h"},
-			expected: []string{"a", "b", "c", "d", "e", "f", "g", "h"},
-		},
-		{
 			name:     "array addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -1006,7 +871,9 @@ func TestArray(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()
@@ -1040,16 +907,6 @@ func TestMap(t *testing.T) {
 		expected map[string]string
 	}{
 		{
-			name:     "integer addition with redis broker/backend",
-			broker:   redisBroker,
-			backend:  redisBackend,
-			taskName: uuid.Must(uuid.NewV4()).String(),
-			taskFunc: addMap,
-			inA:      map[string]string{"a": "a"},
-			inB:      map[string]string{"b": "b"},
-			expected: map[string]string{"a": "a", "b": "b"},
-		},
-		{
 			name:     "integer addition with redis broker/backend with connection",
 			broker:   redisBrokerWithConn,
 			backend:  redisBackendWithConn,
@@ -1074,7 +931,9 @@ func TestMap(t *testing.T) {
 		cli, _ := NewCeleryClient(tc.broker, tc.backend, 1)
 		cli.Register(tc.taskName, tc.taskFunc)
 		cli.StartWorker()
-		asyncResult, err := cli.Delay(tc.taskName, tc.inA, tc.inB)
+		task := GetTaskMessage(tc.taskName)
+		task.Args = append(task.Args, tc.inA, tc.inB)
+		asyncResult, err := cli.Delay(task)
 		if err != nil {
 			t.Errorf("test '%s': failed to get result for task %s: %+v", tc.name, tc.taskName, err)
 			cli.StopWorker()

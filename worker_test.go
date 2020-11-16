@@ -29,8 +29,8 @@ func TestWorkerRegisterTask(t *testing.T) {
 	}{
 		{
 			name:           "register task with redis broker/backend",
-			broker:         redisBroker,
-			backend:        redisBackend,
+			broker:         redisBrokerWithConn,
+			backend:        redisBackendWithConn,
 			registeredTask: add,
 		},
 		{
@@ -64,8 +64,8 @@ func TestWorkerRunTask(t *testing.T) {
 	}{
 		{
 			name:           "run task with redis broker/backend",
-			broker:         redisBroker,
-			backend:        redisBackend,
+			broker:         redisBrokerWithConn,
+			backend:        redisBackendWithConn,
 			registeredTask: add,
 		},
 		{
@@ -113,8 +113,8 @@ func TestWorkerNumWorkers(t *testing.T) {
 	}{
 		{
 			name:    "ensure correct number of workers with redis broker/backend",
-			broker:  redisBroker,
-			backend: redisBackend,
+			broker:  redisBrokerWithConn,
+			backend: redisBackendWithConn,
 		},
 		{
 			name:    "ensure correct number of workers with amqp broker/backend",
@@ -143,8 +143,8 @@ func TestWorkerStartStop(t *testing.T) {
 	}{
 		{
 			name:    "start and gracefully stop workers with redis broker/backend",
-			broker:  redisBroker,
-			backend: redisBackend,
+			broker:  redisBrokerWithConn,
+			backend: redisBackendWithConn,
 		},
 		{
 			name:    "start and gracefully stop workers with amqp broker/backend",
