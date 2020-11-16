@@ -7,38 +7,27 @@ package gocelery
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 // RedisCeleryBackend is celery backend for redis
 type RedisCeleryBackend struct {
-	*redis.Pool
+	*redis.Client
 }
 
 // NewRedisBackend creates new RedisCeleryBackend with given redis pool.
 // RedisCeleryBackend can be initialized manually as well.
-func NewRedisBackend(conn *redis.Pool) *RedisCeleryBackend {
+func NewRedisBackend(conn *redis.Client) *RedisCeleryBackend {
 	return &RedisCeleryBackend{
-		Pool: conn,
-	}
-}
-
-// NewRedisCeleryBackend creates new RedisCeleryBackend
-//
-// Deprecated: NewRedisCeleryBackend exists for historical compatibility
-// and should not be used. Pool should be initialized outside of gocelery package.
-func NewRedisCeleryBackend(uri string) *RedisCeleryBackend {
-	return &RedisCeleryBackend{
-		Pool: NewRedisPool(uri),
+		Client: conn,
 	}
 }
 
 // GetResult queries redis backend to get asynchronous result
 func (cb *RedisCeleryBackend) GetResult(taskID string) (*ResultMessage, error) {
-	conn := cb.Get()
-	defer conn.Close()
-	val, err := conn.Do("GET", fmt.Sprintf("celery-task-meta-%s", taskID))
+	val, err := cb.Client.Get(cb.Context(), fmt.Sprintf("celery-task-meta-%s", taskID)).Bytes()
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +35,7 @@ func (cb *RedisCeleryBackend) GetResult(taskID string) (*ResultMessage, error) {
 		return nil, fmt.Errorf("result not available")
 	}
 	var resultMessage ResultMessage
-	err = json.Unmarshal(val.([]byte), &resultMessage)
+	err = json.Unmarshal(val, &resultMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -59,19 +48,12 @@ func (cb *RedisCeleryBackend) SetResult(taskID string, result *ResultMessage) er
 	if err != nil {
 		return err
 	}
-	conn := cb.Get()
-	defer conn.Close()
-	_, err = conn.Do("SETEX", fmt.Sprintf("celery-task-meta-%s", taskID), 86400, resBytes)
+	_, err = cb.Client.SetEX(cb.Context(), fmt.Sprintf("celery-task-meta-%s", taskID), resBytes, time.Second * 86400).Result()
 	return err
 }
 
 // DeleteResult deletes the result from the redis backend
 func (cb *RedisCeleryBackend) DeleteResult(taskID string) error {
-	conn := cb.Get()
-	defer conn.Close()
-	_, err := conn.Do("DEL", fmt.Sprintf("celery-task-meta-%s", taskID))
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := cb.Client.Del(cb.Context(), fmt.Sprintf("celery-task-meta-%s", taskID)).Result()
+	return err
 }
